@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(venvScripts:*)",
+      "Bash(venv/Scripts/activate:*)",
+      "Bash(pip install:*)",
+      "Bash(pyinstaller:*)",
+      "Bash(dist/ExifAnalyzer-CLI.exe:*)",
+      "Bash(\"dist\\ExifAnalyzer-CLI.exe\" --help)",
+      "Bash(\"dist\\ExifAnalyzer-CLI.exe\":*)",
+      "Bash(\"dist\\ExifAnalyzer-GUI.exe\")",
+      "Bash(dir:*)",
+      "Bash(ExifAnalyzer-CLI.exe:*)",
+      "Bash(\"ExifAnalyzer-CLI.exe\" --help)",
+      "Bash(./ExifAnalyzer-CLI.exe --help)",
+      "Bash(./ExifAnalyzer-GUI.exe)",
+      "Bash(./ExifAnalyzer-CLI.exe:*)",
+      "Bash(./dist/ExifAnalyzer-GUI.exe)",
+      "Bash(zip:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
