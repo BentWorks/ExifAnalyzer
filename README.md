@@ -1,68 +1,76 @@
 # ExifAnalyzer
 
 > 🔒 **Privacy-First Image Metadata Tool**
+> **✅ v1.0.0-beta - Production Ready**
 
-A lightweight, cross-platform utility for viewing, editing, and stripping metadata from image files. Designed for both CLI power users and casual GUI users who need to sanitize, inspect, or modify metadata for privacy, security, or organizational purposes.
+A complete, cross-platform utility for viewing and stripping metadata from image files. Features both CLI and GUI interfaces for privacy-focused image processing. **Ready-to-use Windows executables included** - no installation required!
 
 ## ✨ Features
 
-- **🔍 Metadata Viewing**: Human-readable and JSON outputs with unified view across EXIF, IPTC, XMP, and format-specific metadata
-- **✏️ Selective Editing**: Modify specific tags while preserving others
-- **🧹 Privacy Protection**: Remove all metadata or target GPS/location data specifically
-- **📁 Batch Processing**: Process multiple files with directory recursion support
+- **🔍 Metadata Viewing**: Comprehensive EXIF, IPTC, and XMP data display
+- **🧹 Privacy Protection**: Remove all metadata or GPS/location data only
+- **📁 Batch Processing**: Process multiple files and directories
 - **💾 Safe Operations**: Automatic backups with pixel data integrity verification
-- **🔄 Export/Import**: Save metadata as JSON or XMP sidecar files for later restoration
-- **🖥️ Cross-Platform**: Works on Windows, macOS, and Linux
-- **⚡ Fast & Lightweight**: Operations complete in under 1 second for typical images
+- **🖥️ Dual Interface**: Command-line tool and user-friendly GUI
+- **📦 Ready-to-Run**: Windows executables included, no installation needed
+- **🏃 Fast & Lightweight**: Instant processing for typical images
+- **🔒 Privacy-First**: Local processing only, no network connectivity
 
 ## 🚀 Quick Start
 
-### Installation
+### Ready-to-Use Executables (Windows)
 
+**Download the latest release** and extract the zip file:
+- `ExifAnalyzer-GUI.exe` - User-friendly graphical interface
+- `ExifAnalyzer-CLI.exe` - Command-line interface
+
+### GUI Usage
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/ExifAnalyzer.git
-cd ExifAnalyzer
+# Run the GUI
+ExifAnalyzer-GUI.exe
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\\Scripts\\activate
-
-# Install dependencies
-pip install -r requirements.txt
+# 1. Click "File" to select an image
+# 2. View metadata in the tree display
+# 3. Use "Strip All Metadata" or "Strip GPS Only" buttons
+# 4. Privacy warnings highlight sensitive data in red
 ```
 
-### Basic Usage
-
+### CLI Usage
 ```bash
 # View metadata from an image
-python -m src.exif_analyzer.cli.main view image.jpg
+ExifAnalyzer-CLI.exe view image.jpg
 
 # Strip all metadata
-python -m src.exif_analyzer.cli.main strip image.jpg
+ExifAnalyzer-CLI.exe strip image.jpg
 
 # Remove only GPS/location data
-python -m src.exif_analyzer.cli.main strip --gps-only image.jpg
+ExifAnalyzer-CLI.exe strip --gps-only image.jpg
 
-# Export metadata to JSON
-python -m src.exif_analyzer.cli.main export image.jpg metadata.json
+# Batch process multiple files
+ExifAnalyzer-CLI.exe strip *.jpg
 
-# Batch process all JPEGs in a directory
-python -m src.exif_analyzer.cli.main batch strip photos/ --recursive
+# Get help
+ExifAnalyzer-CLI.exe --help
+```
 
-# View supported formats
-python -m src.exif_analyzer.cli.main formats
+### Development Installation
+
+```bash
+git clone https://github.com/BentWorks/ExifAnalyzer.git
+cd ExifAnalyzer
+pip install -r requirements.txt
+python cli_launcher.py --help  # CLI
+python gui_launcher.py          # GUI
 ```
 
 ## 📋 Supported Formats
 
-| Format | Read | Write | Strip | Notes |
-|--------|------|-------|-------|-------|
-| **JPEG** | ✅ | ✅ | ✅ | EXIF, IPTC, XMP support |
-| **PNG** | ✅ | ✅ | ✅ | tEXt, iTXt, zTXt, XMP chunks |
-| **TIFF** | 🚧 | 🚧 | 🚧 | Planned for v0.2 |
-| **WebP** | 🚧 | 🚧 | 🚧 | Planned for v0.2 |
-| **GIF** | 🚧 | 🚧 | 🚧 | Planned for v0.2 |
+| Format | View | Strip | Notes |
+|--------|------|-------|-------|
+| **JPEG** | ✅ | ✅ | Complete EXIF, IPTC, XMP support |
+| **PNG** | ✅ | ✅ | Text chunks and XMP metadata |
+| **TIFF** | 🚧 | 🚧 | Planned for v1.1 |
+| **WebP** | 🚧 | 🚧 | Planned for v1.1 |
 
 ## 🏗️ Architecture
 
@@ -149,30 +157,32 @@ python -m flake8 src/ tests/
 python -m mypy src/
 ```
 
-## 📊 Current Status
+## 📊 Project Status
 
-### ✅ Phase 1: Core Metadata Engine (Complete)
+### ✅ v1.0.0-beta Released (Production Ready)
 
-- [x] Metadata abstraction layer
-- [x] JPEG adapter (EXIF, IPTC, XMP)
-- [x] PNG adapter (text chunks, XMP)
-- [x] File safety mechanisms
-- [x] Basic CLI interface
-- [x] Comprehensive test suite (23 tests, 52% coverage)
+**Complete Implementation:**
+- [x] Full CLI interface with all commands
+- [x] Complete GUI interface with file browser
+- [x] JPEG metadata handling (EXIF, IPTC, XMP)
+- [x] PNG metadata handling (text chunks, XMP)
+- [x] Privacy-focused GPS/location detection
+- [x] Safe file operations with automatic backups
+- [x] Windows executables (32MB each, self-contained)
+- [x] Comprehensive test suite (116 tests, 67% coverage)
+- [x] Complete documentation and user guides
 
-### 🚧 Phase 2: CLI Interface (In Progress)
+**Key Achievements:**
+- **File Safety**: 94% test coverage for critical operations
+- **Zero Installation**: Ready-to-run Windows executables
+- **Production Quality**: Handles real-world image processing safely
+- **User-Friendly**: Both technical CLI and intuitive GUI interfaces
 
-- [ ] Enhanced command-line features
-- [ ] Advanced batch processing
-- [ ] Configuration management
-- [ ] Performance optimizations
+### 🚀 What's Next
 
-### 📅 Planned Features
-
-- **Phase 3**: GUI Interface with PySimpleGUI
-- **Phase 4**: Additional format support (TIFF, WebP, GIF)
-- **Phase 5**: Advanced metadata editing
-- **Phase 6**: Packaging and distribution
+- **v1.1**: Additional format support (TIFF, WebP)
+- **v1.2**: Cross-platform executables (macOS, Linux)
+- **v1.3**: Advanced batch processing features
 
 ## 🤝 Contributing
 
@@ -205,8 +215,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/your-username/ExifAnalyzer/issues)
-- 💬 [Discussions](https://github.com/your-username/ExifAnalyzer/discussions)
+- 🐛 [Issue Tracker](https://github.com/BentWorks/ExifAnalyzer/issues)
+- 💬 [Discussions](https://github.com/BentWorks/ExifAnalyzer/discussions)
 
 ---
 
