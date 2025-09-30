@@ -17,7 +17,10 @@
       "Bash(./ExifAnalyzer-GUI.exe)",
       "Bash(./ExifAnalyzer-CLI.exe:*)",
       "Bash(./dist/ExifAnalyzer-GUI.exe)",
-      "Bash(zip:*)"
+      "Bash(zip:*)",
+      "Bash(find:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
