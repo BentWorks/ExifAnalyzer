@@ -113,8 +113,7 @@ def view(ctx, file_path: Path, output_json: bool, show_all: bool, privacy_check:
                 click.echo(f"\\n{StyleFormatter.highlight('Metadata Summary:')}")
 
                 total_keys = 0
-                for block_name, block in [("EXIF", metadata.exif), ("IPTC", metadata.iptc),
-                                         ("XMP", metadata.xmp), ("Custom", metadata.custom)]:
+                for block_name, block in metadata.iter_named_blocks():
                     if not block.is_empty():
                         count = len(block.keys())
                         total_keys += count
@@ -135,8 +134,7 @@ def view(ctx, file_path: Path, output_json: bool, show_all: bool, privacy_check:
                 # Show detailed metadata if requested
                 if show_all:
                     click.echo(f"\\n{StyleFormatter.highlight('Detailed Metadata:')}")
-                    for block_name, block in [("EXIF", metadata.exif), ("IPTC", metadata.iptc),
-                                             ("XMP", metadata.xmp), ("Custom", metadata.custom)]:
+                    for block_name, block in metadata.iter_named_blocks():
                         if not block.is_empty():
                             click.echo(f"\\n   {StyleFormatter.highlight(block_name)}:")
                             for key in sorted(block.keys()):
@@ -205,9 +203,9 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
                 else:
                     click.echo("No GPS data found to remove.")
             else:
-                total_keys = sum(len(block.keys()) for block in [metadata.exif, metadata.iptc, metadata.xmp, metadata.custom])
+                total_keys = sum(len(block.keys()) for block in metadata.iter_blocks())
                 if keep:
-                    keep_count = len([k for block in [metadata.exif, metadata.iptc, metadata.xmp, metadata.custom]
+                    keep_count = len([k for block in metadata.iter_blocks()
                                     for key in block.keys() if any(pattern in key.lower() for pattern in keep)])
                     click.echo(f"Would remove {total_keys - keep_count} of {total_keys} metadata keys")
                     click.echo(f"Would keep {keep_count} keys matching: {', '.join(keep)}")
@@ -222,7 +220,7 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
                     click.echo("Operation cancelled.")
                     return
             else:
-                total_keys = sum(len(block.keys()) for block in [metadata.exif, metadata.iptc, metadata.xmp, metadata.custom])
+                total_keys = sum(len(block.keys()) for block in metadata.iter_blocks())
                 if not confirm_operation(f"Remove all {total_keys} metadata entries from {file_path.name}?", default=False):
                     click.echo("Operation cancelled.")
                     return
@@ -241,7 +239,7 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
             if keep:
                 original_metadata = engine.read_metadata(file_path)
                 # Remove non-matching keys
-                for block in [original_metadata.exif, original_metadata.iptc, original_metadata.xmp, original_metadata.custom]:
+                for block in original_metadata.iter_blocks():
                     keys_to_remove = []
                     for key in block.keys():
                         if not any(pattern.lower() in key.lower() for pattern in keep):
@@ -250,7 +248,7 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
                         block.remove(key)
 
                 result_path = engine.write_metadata(original_metadata, output, create_backup=backup)
-                kept_count = sum(len(block.keys()) for block in [original_metadata.exif, original_metadata.iptc, original_metadata.xmp, original_metadata.custom])
+                kept_count = sum(len(block.keys()) for block in original_metadata.iter_blocks())
                 click.echo(StyleFormatter.success(f"Metadata filtered (kept {kept_count} keys): {result_path}"))
             else:
                 result_path = engine.strip_metadata(file_path, output, create_backup=backup)
@@ -418,7 +416,7 @@ def strip(ctx, directory: Path, recursive: bool, pattern: str, output_dir: Optio
                 elif keep:
                     # Handle selective stripping
                     metadata = engine.read_metadata(file_path)
-                    for block in [metadata.exif, metadata.iptc, metadata.xmp, metadata.custom]:
+                    for block in metadata.iter_blocks():
                         keys_to_remove = []
                         for key in block.keys():
                             if not any(pattern.lower() in key.lower() for pattern in keep):

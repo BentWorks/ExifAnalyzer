@@ -101,7 +101,7 @@ class JPEGAdapter(BaseMetadataAdapter):
                             if isinstance(value, bytes):
                                 try:
                                     value = value.decode('utf-8', errors='ignore').strip('\x00')
-                                except:
+                                except (UnicodeDecodeError, AttributeError):
                                     value = value.hex()
 
                             # Store with IFD prefix for clarity
@@ -255,7 +255,7 @@ class JPEGAdapter(BaseMetadataAdapter):
                 return getattr(piexif.ExifIFD, tag_name, None)
             else:
                 return getattr(piexif.ImageIFD, tag_name, None)
-        except:
+        except AttributeError:
             return None
 
     def strip_metadata(self, file_path: Path, output_path: Optional[Path] = None) -> Path:

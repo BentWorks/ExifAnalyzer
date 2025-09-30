@@ -145,8 +145,8 @@ class PNGAdapter(BaseMetadataAdapter):
             if compression_flag == b'\\x01':
                 try:
                     text_data = zlib.decompress(text_data)
-                except:
-                    logger.debug(f"Failed to decompress iTXt chunk: {keyword}")
+                except zlib.error as e:
+                    logger.debug(f"Failed to decompress iTXt chunk: {keyword}: {e}")
 
             text = text_data.decode('utf-8', errors='ignore')
 

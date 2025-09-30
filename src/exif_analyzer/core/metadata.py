@@ -48,6 +48,20 @@ class ImageMetadata:
     Normalizes metadata from different sources (EXIF, IPTC, XMP, format-specific)
     into a consistent interface while preserving original data structure.
     """
+    # Privacy-sensitive pattern constants
+    GPS_PATTERNS = [
+        "gps", "latitude", "longitude", "altitude", "location",
+        "geotag", "coordinate", "position"
+    ]
+
+    DEVICE_PATTERNS = [
+        "make", "model", "software", "lens", "serial", "camera"
+    ]
+
+    PERSONAL_PATTERNS = [
+        "artist", "author", "creator", "owner", "copyright", "contact"
+    ]
+
     file_path: Path
     format: str
     exif: MetadataBlock = field(default_factory=lambda: MetadataBlock("exif"))
@@ -78,21 +92,49 @@ class ImageMetadata:
         }
         return blocks.get(block_name.lower())
 
+    def iter_blocks(self):
+        """
+        Iterate over all metadata blocks.
+
+        Yields:
+            MetadataBlock: Each metadata block in order (exif, iptc, xmp, custom)
+        """
+        yield self.exif
+        yield self.iptc
+        yield self.xmp
+        yield self.custom
+
+    def iter_named_blocks(self):
+        """
+        Iterate over all metadata blocks with their display names.
+
+        Yields:
+            tuple: (display_name, MetadataBlock) pairs
+        """
+        yield ("EXIF", self.exif)
+        yield ("IPTC", self.iptc)
+        yield ("XMP", self.xmp)
+        yield ("Custom", self.custom)
+
+    def get_all_blocks(self) -> List[MetadataBlock]:
+        """
+        Get all metadata blocks as a list.
+
+        Returns:
+            List of all metadata blocks
+        """
+        return [self.exif, self.iptc, self.xmp, self.custom]
+
     def has_metadata(self) -> bool:
         """Check if image has any metadata."""
-        return any(not block.is_empty() for block in [self.exif, self.iptc, self.xmp, self.custom])
+        return any(not block.is_empty() for block in self.iter_blocks())
 
     def has_gps_data(self) -> bool:
         """Check if image contains GPS/location data."""
-        gps_patterns = [
-            "gps", "latitude", "longitude", "altitude", "location",
-            "geotag", "coordinate", "position"
-        ]
-
-        for block in [self.exif, self.iptc, self.xmp, self.custom]:
+        for block in self.iter_blocks():
             for key in block.keys():
                 key_lower = key.lower()
-                if any(pattern in key_lower for pattern in gps_patterns):
+                if any(pattern in key_lower for pattern in self.GPS_PATTERNS):
                     return True
         return False
 
@@ -104,17 +146,7 @@ class ImageMetadata:
             List of (block_name, key) tuples for sensitive data
         """
         sensitive_keys = []
-
-        # GPS and location data
-        gps_patterns = ["gps", "location", "geotag", "coordinate"]
-
-        # Device and software info
-        device_patterns = ["make", "model", "software", "lens", "serial", "camera"]
-
-        # Personal info
-        personal_patterns = ["artist", "author", "creator", "owner", "copyright", "contact"]
-
-        all_patterns = gps_patterns + device_patterns + personal_patterns
+        all_patterns = self.GPS_PATTERNS + self.DEVICE_PATTERNS + self.PERSONAL_PATTERNS
 
         for block_name, block in [("exif", self.exif), ("iptc", self.iptc),
                                  ("xmp", self.xmp), ("custom", self.custom)]:
@@ -133,12 +165,11 @@ class ImageMetadata:
             Number of GPS-related keys removed
         """
         removed_count = 0
-        gps_patterns = ["gps", "location", "geotag", "coordinate"]
 
-        for block in [self.exif, self.iptc, self.xmp, self.custom]:
+        for block in self.iter_blocks():
             keys_to_remove = []
             for key in block.keys():
-                if any(pattern in key.lower() for pattern in gps_patterns):
+                if any(pattern in key.lower() for pattern in self.GPS_PATTERNS):
                     keys_to_remove.append(key)
 
             for key in keys_to_remove:
@@ -157,7 +188,7 @@ class ImageMetadata:
         """
         removed_count = 0
 
-        for block in [self.exif, self.iptc, self.xmp, self.custom]:
+        for block in self.iter_blocks():
             keys = list(block.keys())
             for key in keys:
                 if block.remove(key):

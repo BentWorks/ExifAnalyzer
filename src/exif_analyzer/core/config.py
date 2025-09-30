@@ -1,6 +1,7 @@
 """
 Configuration management for ExifAnalyzer.
 """
+import copy
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
@@ -54,7 +55,7 @@ class ConfigManager:
         """Initialize configuration manager."""
         self.user_config_path = self._get_user_config_path()
         self.project_config_path = Path.cwd() / ".exifanalyzer.json"
-        self._config = self.DEFAULT_CONFIG.copy()
+        self._config = copy.deepcopy(self.DEFAULT_CONFIG)
         self._load_config()
 
     def _get_user_config_path(self) -> Path:
@@ -164,7 +165,7 @@ class ConfigManager:
 
     def reset_to_defaults(self) -> None:
         """Reset configuration to default values."""
-        self._config = self.DEFAULT_CONFIG.copy()
+        self._config = copy.deepcopy(self.DEFAULT_CONFIG)
         logger.info("Configuration reset to defaults")
 
     def validate_config(self) -> bool:
@@ -222,7 +223,7 @@ class ConfigManager:
 
     def to_dict(self) -> Dict[str, Any]:
         """Get full configuration as dictionary."""
-        return self._config.copy()
+        return copy.deepcopy(self._config)
 
     def __str__(self) -> str:
         """String representation of configuration."""
