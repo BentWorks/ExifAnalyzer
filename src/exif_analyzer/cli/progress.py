@@ -3,7 +3,7 @@ Progress reporting utilities for CLI operations.
 """
 import time
 from pathlib import Path
-from typing import Optional, Iterator, List, Any
+from typing import Optional, Iterator, List, Any, Dict, Callable
 import click
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
@@ -16,14 +16,14 @@ class ProgressReporter:
     Handles progress reporting for CLI operations.
     """
 
-    def __init__(self, show_progress: bool = True):
+    def __init__(self, show_progress: bool = True) -> None:
         """Initialize progress reporter."""
-        self.show_progress = show_progress
-        self._lock = Lock()
-        self._start_time = None
-        self._completed = 0
-        self._total = 0
-        self._errors = 0
+        self.show_progress: bool = show_progress
+        self._lock: Lock = Lock()
+        self._start_time: Optional[float] = None
+        self._completed: int = 0
+        self._total: int = 0
+        self._errors: int = 0
 
     def start(self, total: int, operation: str = "Processing") -> None:
         """Start progress tracking."""
@@ -74,18 +74,18 @@ class BatchProcessor:
     Handles batch processing with progress reporting and concurrency.
     """
 
-    def __init__(self, max_workers: int = 4, show_progress: bool = True):
+    def __init__(self, max_workers: int = 4, show_progress: bool = True) -> None:
         """Initialize batch processor."""
-        self.max_workers = max_workers
-        self.progress = ProgressReporter(show_progress)
+        self.max_workers: int = max_workers
+        self.progress: ProgressReporter = ProgressReporter(show_progress)
 
     def process_files(
         self,
         files: List[Path],
-        operation_func,
+        operation_func: Callable[..., Any],
         operation_name: str = "Processing",
-        **kwargs
-    ) -> dict:
+        **kwargs: Any
+    ) -> Dict[Path, Any]:
         """
         Process files with concurrent execution and progress reporting.
 

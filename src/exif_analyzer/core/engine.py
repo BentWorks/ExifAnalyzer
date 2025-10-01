@@ -27,6 +27,7 @@ class MetadataEngine:
         """Initialize metadata engine with available adapters."""
         self.adapters: Dict[str, BaseMetadataAdapter] = {}
         self.safety_manager = FileSafetyManager()
+        self._mime_to_format: Dict[str, str] = {}
 
         # Register built-in adapters
         self._register_adapters()
@@ -44,6 +45,32 @@ class MetadataEngine:
                 self.adapters[format_ext.lower()] = adapter
                 logger.debug(f"Registered {adapter.format_name} adapter for .{format_ext}")
 
+            # Build MIME type mapping dynamically from registered adapters
+            self._build_mime_map(adapter)
+
+    def _build_mime_map(self, adapter: BaseMetadataAdapter) -> None:
+        """
+        Build MIME type to format extension mapping from adapter.
+
+        Args:
+            adapter: Adapter to build mapping from
+        """
+        # Map common MIME types to first supported format extension
+        format_to_mime = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'tiff': 'image/tiff',
+            'tif': 'image/tiff',
+            'webp': 'image/webp',
+            'gif': 'image/gif'
+        }
+
+        for format_ext in adapter.supported_formats:
+            mime_type = format_to_mime.get(format_ext.lower())
+            if mime_type and mime_type not in self._mime_to_format:
+                self._mime_to_format[mime_type] = format_ext.lower()
+
     def register_adapter(self, adapter: BaseMetadataAdapter) -> None:
         """
         Register a custom adapter.
@@ -54,6 +81,9 @@ class MetadataEngine:
         for format_ext in adapter.supported_formats:
             self.adapters[format_ext.lower()] = adapter
             logger.info(f"Registered custom {adapter.format_name} adapter for .{format_ext}")
+
+        # Update MIME mapping for custom adapter
+        self._build_mime_map(adapter)
 
     def get_adapter(self, file_path: Path) -> BaseMetadataAdapter:
         """
@@ -81,14 +111,7 @@ class MetadataEngine:
         # Try MIME type detection as fallback
         mime_type, _ = mimetypes.guess_type(str(file_path))
         if mime_type:
-            format_map = {
-                'image/jpeg': 'jpg',
-                'image/png': 'png',
-                'image/tiff': 'tiff',
-                'image/webp': 'webp',
-                'image/gif': 'gif'
-            }
-            mapped_format = format_map.get(mime_type)
+            mapped_format = self._mime_to_format.get(mime_type)
             if mapped_format and mapped_format in self.adapters:
                 return self.adapters[mapped_format]
 
