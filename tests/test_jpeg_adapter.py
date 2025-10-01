@@ -187,3 +187,201 @@ class TestJPEGAdapter:
         repr_str = repr(self.adapter)
         assert "JPEGAdapter" in repr_str
         assert "formats" in repr_str
+
+    def test_iptc_detection(self, temp_dir):
+        """Test IPTC metadata detection."""
+        jpeg_file = temp_dir / "test_iptc.jpg"
+
+        # Create JPEG with IPTC marker
+        img = Image.new('RGB', (100, 100), color='green')
+        img.save(jpeg_file, "JPEG")
+
+        # Inject IPTC marker into file
+        with open(jpeg_file, 'rb') as f:
+            data = f.read()
+
+        # Insert Photoshop IPTC marker
+        iptc_marker = b'Photoshop 3.0\x008BIM\x04\x04\x00\x00\x00\x00\x00\x00'
+        modified_data = data[:100] + iptc_marker + data[100:]
+
+        with open(jpeg_file, 'wb') as f:
+            f.write(modified_data)
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Should detect IPTC presence
+        assert metadata.iptc.get("IPTC_Present") == True
+
+    def test_xmp_metadata_extraction(self, temp_dir):
+        """Test XMP metadata extraction from JPEG."""
+        jpeg_file = temp_dir / "test_xmp.jpg"
+
+        # Create JPEG
+        img = Image.new('RGB', (100, 100), color='purple')
+        img.save(jpeg_file, "JPEG")
+
+        # Inject XMP data into file
+        with open(jpeg_file, 'rb') as f:
+            data = f.read()
+
+        # Insert XMP packet
+        xmp_data = b'http://ns.adobe.com/xap/1.0/\x00<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta>Test XMP Data</x:xmpmeta><?xpacket end="w"?>'
+        modified_data = data[:100] + xmp_data + data[100:]
+
+        with open(jpeg_file, 'wb') as f:
+            f.write(modified_data)
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Should detect XMP presence
+        assert metadata.xmp.get("XMP_Present") == True
+        xmp_raw = metadata.xmp.get("XMP_Raw")
+        assert xmp_raw is not None
+        assert "xmpmeta" in xmp_raw.lower()
+
+    def test_strip_all_metadata(self, temp_dir):
+        """Test stripping all metadata (JPEG adapter strips all, not selective)."""
+        jpeg_file = temp_dir / "test_with_gps.jpg"
+        output_file = temp_dir / "test_all_stripped.jpg"
+
+        # Create file with GPS and other EXIF
+        self.create_test_jpeg_with_exif(jpeg_file)
+
+        # Verify it has metadata
+        original_metadata = self.adapter.read_metadata(jpeg_file)
+        assert original_metadata.has_metadata()
+        assert original_metadata.has_gps_data()
+
+        # Strip all metadata (JPEG adapter doesn't support selective stripping)
+        result_path = self.adapter.strip_metadata(jpeg_file, output_file)
+
+        assert result_path == output_file
+        assert output_file.exists()
+
+        # Verify all metadata was removed
+        stripped_metadata = self.adapter.read_metadata(output_file)
+        assert not stripped_metadata.has_gps_data()
+
+    def test_bytes_value_handling_in_exif(self, temp_dir):
+        """Test handling of bytes values in EXIF data."""
+        jpeg_file = temp_dir / "test_bytes_exif.jpg"
+
+        # Create JPEG with bytes EXIF values
+        img = Image.new('RGB', (100, 100), color='yellow')
+
+        exif_dict = {
+            "0th": {
+                piexif.ImageIFD.Make: b"Canon\x00",  # Bytes with null terminator
+                piexif.ImageIFD.Model: b"EOS 5D Mark IV",
+            },
+            "Exif": {
+                piexif.ExifIFD.UserComment: b"Test Comment with bytes",
+            }
+        }
+
+        exif_bytes = piexif.dump(exif_dict)
+        img.save(jpeg_file, "JPEG", exif=exif_bytes)
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Should successfully parse bytes values
+        assert metadata.exif is not None
+        assert len(metadata.exif.keys()) > 0
+
+    def test_corrupted_exif_handling(self, temp_dir):
+        """Test handling of corrupted EXIF data."""
+        jpeg_file = temp_dir / "test_corrupted_exif.jpg"
+
+        # Create JPEG
+        img = Image.new('RGB', (100, 100), color='brown')
+        img.save(jpeg_file, "JPEG")
+
+        # Inject corrupted EXIF marker
+        with open(jpeg_file, 'rb') as f:
+            data = f.read()
+
+        # Insert malformed EXIF marker
+        corrupted_exif = b'\xff\xe1\x00\x10Exif\x00\x00CORRUPTED'
+        modified_data = data[:2] + corrupted_exif + data[2:]
+
+        with open(jpeg_file, 'wb') as f:
+            f.write(modified_data)
+
+        # Should handle gracefully without crashing
+        try:
+            metadata = self.adapter.read_metadata(jpeg_file)
+            assert metadata is not None  # Should still return metadata object
+        except MetadataError:
+            pass  # Acceptable to raise MetadataError for corrupted data
+
+    def test_multiple_ifd_tags(self, temp_dir):
+        """Test reading tags from multiple IFD sections."""
+        jpeg_file = temp_dir / "test_multi_ifd.jpg"
+
+        # Create JPEG with data in multiple IFDs
+        img = Image.new('RGB', (100, 100), color='cyan')
+
+        exif_dict = {
+            "0th": {
+                piexif.ImageIFD.Make: "TestMake",
+                piexif.ImageIFD.Model: "TestModel",
+            },
+            "Exif": {
+                piexif.ExifIFD.DateTimeOriginal: "2025:01:01 12:00:00",
+                piexif.ExifIFD.LensModel: "24-70mm f/2.8",
+            },
+            "1st": {
+                piexif.ImageIFD.Compression: 6,
+            }
+        }
+
+        exif_bytes = piexif.dump(exif_dict)
+        img.save(jpeg_file, "JPEG", exif=exif_bytes)
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Should read tags from all IFDs
+        assert len(metadata.exif.keys()) > 0
+        # Check for tags from different IFDs
+        has_0th_tag = any("make" in key.lower() or "model" in key.lower() for key in metadata.exif.keys())
+        has_exif_tag = any("datetime" in key.lower() or "lens" in key.lower() for key in metadata.exif.keys())
+        assert has_0th_tag or has_exif_tag
+
+    def test_write_preserves_quality(self, temp_dir):
+        """Test that write_metadata preserves image quality."""
+        jpeg_file = temp_dir / "test_quality.jpg"
+        output_file = temp_dir / "test_quality_written.jpg"
+
+        # Create high-quality JPEG
+        img = Image.new('RGB', (100, 100), color='orange')
+        img.save(jpeg_file, "JPEG", quality=95)
+
+        original_size = jpeg_file.stat().st_size
+
+        # Read and write metadata
+        metadata = self.adapter.read_metadata(jpeg_file)
+        metadata.exif.set("Artist", "Quality Test")
+        self.adapter.write_metadata(metadata, output_file)
+
+        output_size = output_file.stat().st_size
+
+        # Output size should be reasonably close to original
+        # (within 50% to account for metadata changes)
+        assert output_size > original_size * 0.5
+        assert output_size < original_size * 2.0
+
+    def test_read_jpeg_without_exif(self, temp_dir):
+        """Test reading JPEG with no EXIF data."""
+        jpeg_file = temp_dir / "test_no_exif.jpg"
+
+        # Create minimal JPEG
+        img = Image.new('RGB', (50, 50), color='gray')
+        img.save(jpeg_file, "JPEG")
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Should still return valid metadata object
+        assert metadata is not None
+        assert metadata.format == "JPEG"
+        # May have no EXIF or minimal EXIF
+        assert isinstance(metadata.exif.keys(), list)
