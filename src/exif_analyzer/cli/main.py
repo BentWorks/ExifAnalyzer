@@ -12,6 +12,7 @@ from ..core.exceptions import ExifAnalyzerError
 from ..core.logger import setup_logger
 from ..core.config import config
 from .progress import BatchProcessor, ProgressReporter, confirm_operation, StyleFormatter, validate_output_path
+from .strip_handler import StripOperationHandler
 
 
 @click.group()
@@ -172,6 +173,7 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
     try:
         engine = ctx.obj['engine']
         force = ctx.obj['force']
+        handler = StripOperationHandler(engine)
 
         # Determine backup setting
         if backup is None:
@@ -191,39 +193,13 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
 
         # Preview mode
         if preview:
-            if gps_only:
-                if metadata.has_gps_data():
-                    sensitive_keys = metadata.get_privacy_sensitive_keys()
-                    gps_keys = [key for block, key in sensitive_keys if any(p in key.lower() for p in ['gps', 'location', 'coordinate'])]
-                    click.echo(f"Would remove {len(gps_keys)} GPS-related keys:")
-                    for key in gps_keys[:10]:
-                        click.echo(f"  - {StyleFormatter.warning(key)}")
-                    if len(gps_keys) > 10:
-                        click.echo(f"  ... and {len(gps_keys) - 10} more")
-                else:
-                    click.echo("No GPS data found to remove.")
-            else:
-                total_keys = sum(len(block.keys()) for block in metadata.iter_blocks())
-                if keep:
-                    keep_count = len([k for block in metadata.iter_blocks()
-                                    for key in block.keys() if any(pattern in key.lower() for pattern in keep)])
-                    click.echo(f"Would remove {total_keys - keep_count} of {total_keys} metadata keys")
-                    click.echo(f"Would keep {keep_count} keys matching: {', '.join(keep)}")
-                else:
-                    click.echo(f"Would remove all {total_keys} metadata keys")
+            handler.preview_strip_operation(metadata, gps_only, keep)
             return
 
         # Confirmation for destructive operations
-        if config.should_warn_before_strip() and not force:
-            if gps_only:
-                if not confirm_operation(f"Remove GPS/location data from {file_path.name}?", default=True):
-                    click.echo("Operation cancelled.")
-                    return
-            else:
-                total_keys = sum(len(block.keys()) for block in metadata.iter_blocks())
-                if not confirm_operation(f"Remove all {total_keys} metadata entries from {file_path.name}?", default=False):
-                    click.echo("Operation cancelled.")
-                    return
+        if not handler.confirm_strip_operation(file_path, metadata, gps_only, force):
+            click.echo("Operation cancelled.")
+            return
 
         # Validate output path
         if output and not validate_output_path(output, file_path, force):
@@ -231,28 +207,10 @@ def strip(ctx, file_path: Path, output: Optional[Path], backup: Optional[bool], 
             return
 
         # Perform stripping operation
-        if gps_only:
-            result_path = engine.strip_gps_data(file_path, output, create_backup=backup)
-            click.echo(StyleFormatter.success(f"GPS data stripped: {result_path}"))
-        else:
-            # Handle keep patterns
-            if keep:
-                original_metadata = engine.read_metadata(file_path)
-                # Remove non-matching keys
-                for block in original_metadata.iter_blocks():
-                    keys_to_remove = []
-                    for key in block.keys():
-                        if not any(pattern.lower() in key.lower() for pattern in keep):
-                            keys_to_remove.append(key)
-                    for key in keys_to_remove:
-                        block.remove(key)
-
-                result_path = engine.write_metadata(original_metadata, output, create_backup=backup)
-                kept_count = sum(len(block.keys()) for block in original_metadata.iter_blocks())
-                click.echo(StyleFormatter.success(f"Metadata filtered (kept {kept_count} keys): {result_path}"))
-            else:
-                result_path = engine.strip_metadata(file_path, output, create_backup=backup)
-                click.echo(StyleFormatter.success(f"All metadata stripped: {result_path}"))
+        result_path, message = handler.perform_strip_operation(
+            file_path, output, gps_only, keep, backup
+        )
+        click.echo(StyleFormatter.success(message))
 
         # Show backup info
         if backup and result_path == file_path:
