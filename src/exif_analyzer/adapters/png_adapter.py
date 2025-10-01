@@ -80,7 +80,7 @@ class PNGAdapter(BaseMetadataAdapter):
             with open(file_path, 'rb') as f:
                 # Verify PNG signature
                 signature = f.read(8)
-                if signature != b'\\x89PNG\\r\\n\\x1a\\n':
+                if signature != b'\x89PNG\r\n\x1a\n':
                     raise MetadataError("Invalid PNG signature")
 
                 while True:
@@ -113,7 +113,7 @@ class PNGAdapter(BaseMetadataAdapter):
         """Process tEXt chunk."""
         try:
             # Find null separator
-            null_pos = data.find(b'\\x00')
+            null_pos = data.find(b'\x00')
             if null_pos == -1:
                 return
 
@@ -129,8 +129,8 @@ class PNGAdapter(BaseMetadataAdapter):
     def _process_itext_chunk(self, data: bytes, metadata: ImageMetadata) -> None:
         """Process iTXt chunk (international text)."""
         try:
-            # iTXt format: keyword\\0compression_flag\\0compression_method\\0language_tag\\0translated_keyword\\0text
-            parts = data.split(b'\\x00', 4)
+            # iTXt format: keyword\0compression_flag\0compression_method\0language_tag\0translated_keyword\0text
+            parts = data.split(b'\x00', 4)
             if len(parts) < 5:
                 return
 
@@ -141,7 +141,7 @@ class PNGAdapter(BaseMetadataAdapter):
             remaining = parts[4]
 
             # Find translated keyword separator
-            translated_sep = remaining.find(b'\\x00')
+            translated_sep = remaining.find(b'\x00')
             if translated_sep != -1:
                 translated_keyword = remaining[:translated_sep].decode('utf-8', errors='ignore')
                 text_data = remaining[translated_sep + 1:]
@@ -150,7 +150,7 @@ class PNGAdapter(BaseMetadataAdapter):
                 text_data = remaining
 
             # Decompress if needed
-            if compression_flag == b'\\x01':
+            if compression_flag == b'\x01':
                 try:
                     text_data = zlib.decompress(text_data)
                 except zlib.error as e:
@@ -176,8 +176,8 @@ class PNGAdapter(BaseMetadataAdapter):
     def _process_ztext_chunk(self, data: bytes, metadata: ImageMetadata) -> None:
         """Process zTXt chunk (compressed text)."""
         try:
-            # zTXt format: keyword\\0compression_method\\0compressed_text
-            null_pos = data.find(b'\\x00')
+            # zTXt format: keyword\0compression_method\0compressed_text
+            null_pos = data.find(b'\x00')
             if null_pos == -1:
                 return
 
