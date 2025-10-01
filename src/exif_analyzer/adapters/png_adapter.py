@@ -233,16 +233,16 @@ class PNGAdapter(BaseMetadataAdapter):
 
                     # Add custom metadata as text chunks
                     for key, value in metadata.custom.data.items():
+                        # Extract actual keyword (remove prefix if present)
                         if key.startswith(('tEXt:', 'PIL:')):
-                            # Extract actual keyword
-                            if ':' in key:
-                                actual_key = key.split(':', 1)[1]
-                            else:
-                                actual_key = key
+                            actual_key = key.split(':', 1)[1] if ':' in key else key
+                        else:
+                            # Key without prefix - use as is
+                            actual_key = key
 
-                            # Clean key name (PNG keywords have restrictions)
-                            actual_key = self._clean_png_keyword(actual_key)
-                            png_info.add_text(actual_key, str(value))
+                        # Clean key name (PNG keywords have restrictions)
+                        actual_key = self._clean_png_keyword(actual_key)
+                        png_info.add_text(actual_key, str(value))
 
                     # Add XMP data if present
                     if metadata.xmp.get("XMP_Raw"):
