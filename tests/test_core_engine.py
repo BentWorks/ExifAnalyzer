@@ -149,3 +149,118 @@ class TestMetadataEngine:
         repr_str = repr(self.engine)
         assert "MetadataEngine" in repr_str
         assert "supported_formats" in repr_str
+
+    def test_read_metadata_error_handling(self, temp_dir):
+        """Test read_metadata error propagation."""
+        # Create invalid JPEG file
+        bad_jpeg = temp_dir / "bad.jpg"
+        bad_jpeg.write_bytes(b'\xFF\xD8\xFF\xE0' + b'invalid data')
+
+        with pytest.raises(Exception):  # Should propagate error from adapter
+            self.engine.read_metadata(bad_jpeg)
+
+    def test_write_metadata_with_output_path(self, sample_image_path, temp_dir):
+        """Test write_metadata with explicit output path."""
+        # Read metadata first
+        metadata = self.engine.read_metadata(sample_image_path)
+        output_path = temp_dir / "output.jpg"
+
+        result = self.engine.write_metadata(
+            metadata,
+            output_path=output_path,
+            create_backup=False
+        )
+
+        assert result == output_path
+        assert output_path.exists()
+
+    def test_write_metadata_creates_backup(self, sample_image_path, temp_dir):
+        """Test write_metadata creates backup when overwriting."""
+        # Copy sample image to temp dir with different name
+        test_image = temp_dir / "test_copy.jpg"
+        import shutil
+        shutil.copy2(sample_image_path, test_image)
+
+        # Read metadata
+        metadata = self.engine.read_metadata(test_image)
+
+        # Write back to same file with backup
+        result = self.engine.write_metadata(
+            metadata,
+            output_path=None,  # Write to original
+            create_backup=True
+        )
+
+        assert result == test_image
+        # Backup should have been created (format: test_copy.backup.TIMESTAMP.jpg)
+        backups = list(temp_dir.glob(f"{test_image.stem}.backup.*{test_image.suffix}"))
+        assert len(backups) > 0
+
+    def test_register_custom_adapter(self):
+        """Test registering a custom adapter."""
+        from src.exif_analyzer.core.base_adapter import BaseMetadataAdapter
+        from src.exif_analyzer.core.metadata import ImageMetadata
+
+        class CustomAdapter(BaseMetadataAdapter):
+            @property
+            def supported_formats(self):
+                return ["custom"]
+
+            @property
+            def format_name(self):
+                return "CUSTOM"
+
+            def read_metadata(self, file_path):
+                return ImageMetadata(file_path=file_path, format="CUSTOM")
+
+            def write_metadata(self, metadata, output_path=None):
+                return output_path or metadata.file_path
+
+            def strip_metadata(self, file_path, output_path=None):
+                return output_path or file_path
+
+        engine = MetadataEngine()
+        custom_adapter = CustomAdapter()
+        engine.register_adapter(custom_adapter)
+
+        # Verify registration
+        formats = engine.get_supported_formats()
+        assert "custom" in formats
+
+    def test_strip_metadata_gps_only(self, sample_image_path, temp_dir):
+        """Test stripping GPS data only (not all adapters support gps_only)."""
+        output_path = temp_dir / f"gps_stripped_{sample_image_path.name}"
+
+        try:
+            result = self.engine.strip_metadata(
+                sample_image_path,
+                output_path,
+                gps_only=True,
+                create_backup=False
+            )
+
+            assert result == output_path
+            assert output_path.exists()
+        except TypeError:
+            # Some adapters don't support gps_only parameter
+            # Test basic strip instead
+            result = self.engine.strip_metadata(
+                sample_image_path,
+                output_path,
+                create_backup=False
+            )
+            assert result == output_path
+            assert output_path.exists()
+
+    def test_export_metadata_unsupported_format(self, sample_image_path, temp_dir):
+        """Test error on unsupported export format."""
+        export_path = temp_dir / "metadata.txt"
+
+        with pytest.raises(ValueError) as exc_info:
+            self.engine.export_metadata(
+                sample_image_path,
+                export_path,
+                format="txt"
+            )
+
+        assert "Unsupported export format" in str(exc_info.value)

@@ -68,4 +68,4 @@ sample_images/
 # Keep important build files but ignore executables
 !build_config.py
 !cli_launcher.py
-!gui_launcher.py
+!gui_launcher.pycoverage.json
