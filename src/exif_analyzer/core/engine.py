@@ -15,6 +15,9 @@ from .logger import logger
 # Import adapters
 from ..adapters.jpeg_adapter import JPEGAdapter
 from ..adapters.png_adapter import PNGAdapter
+from ..adapters.webp_adapter import WebPAdapter
+from ..adapters.gif_adapter import GIFAdapter
+from ..adapters.tiff_adapter import TIFFAdapter
 
 
 class MetadataEngine:
@@ -37,7 +40,9 @@ class MetadataEngine:
         adapters = [
             JPEGAdapter(safety_manager=self.safety_manager),
             PNGAdapter(safety_manager=self.safety_manager),
-            # TODO: Add TIFF, WebP, GIF adapters
+            WebPAdapter(safety_manager=self.safety_manager),
+            GIFAdapter(safety_manager=self.safety_manager),
+            TIFFAdapter(safety_manager=self.safety_manager),
         ]
 
         for adapter in adapters:
