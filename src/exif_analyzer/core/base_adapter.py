@@ -3,11 +3,14 @@ Base adapter interface for format-specific metadata handlers.
 """
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from .metadata import ImageMetadata
 from .exceptions import UnsupportedFormatError, MetadataError
 from .logger import logger
+
+if TYPE_CHECKING:
+    from .file_safety import FileSafetyManager
 
 
 class BaseMetadataAdapter(ABC):
@@ -17,6 +20,16 @@ class BaseMetadataAdapter(ABC):
     Each image format (JPEG, PNG, TIFF, etc.) should implement this interface
     to provide consistent metadata operations across different formats.
     """
+
+    def __init__(self, safety_manager: Optional['FileSafetyManager'] = None):
+        """
+        Initialize adapter with optional safety manager.
+
+        Args:
+            safety_manager: Optional FileSafetyManager instance. If None,
+                           adapter operations won't use safety features.
+        """
+        self.safety_manager = safety_manager
 
     @property
     @abstractmethod
@@ -148,6 +161,27 @@ class BaseMetadataAdapter(ABC):
         except Exception as e:
             logger.warning(f"Could not calculate pixel hash for {file_path}: {e}")
             return ""
+
+    def _check_image_dimensions_and_mode(self, orig_img, mod_img) -> bool:
+        """
+        Check that image dimensions and mode are preserved.
+
+        Args:
+            orig_img: Original PIL Image object
+            mod_img: Modified PIL Image object
+
+        Returns:
+            True if dimensions and mode match
+        """
+        if orig_img.size != mod_img.size:
+            logger.error(f"Size mismatch: {orig_img.size} vs {mod_img.size}")
+            return False
+
+        if orig_img.mode != mod_img.mode:
+            logger.error(f"Mode mismatch: {orig_img.mode} vs {mod_img.mode}")
+            return False
+
+        return True
 
     def verify_pixel_integrity(self, original_path: Path, modified_path: Path) -> bool:
         """

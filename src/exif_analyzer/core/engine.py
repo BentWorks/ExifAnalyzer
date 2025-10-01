@@ -4,6 +4,7 @@ Core metadata engine that orchestrates format-specific adapters.
 from pathlib import Path
 from typing import Optional, List, Dict, Type, Union
 import mimetypes
+import json
 
 from .base_adapter import BaseMetadataAdapter
 from .metadata import ImageMetadata
@@ -31,10 +32,10 @@ class MetadataEngine:
         self._register_adapters()
 
     def _register_adapters(self) -> None:
-        """Register all available format adapters."""
+        """Register all available format adapters with shared safety manager."""
         adapters = [
-            JPEGAdapter(),
-            PNGAdapter(),
+            JPEGAdapter(safety_manager=self.safety_manager),
+            PNGAdapter(safety_manager=self.safety_manager),
             # TODO: Add TIFF, WebP, GIF adapters
         ]
 
@@ -276,13 +277,11 @@ class MetadataEngine:
         """
         metadata_path = Path(metadata_path)
 
-        # Load metadata from file
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata_dict = f.read()
-
-        # Parse metadata
+        # Load and parse metadata from file
         if metadata_path.suffix.lower() == '.json':
-            restored_metadata = ImageMetadata.from_json(metadata_dict)
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata_dict = json.load(f)
+            restored_metadata = ImageMetadata.from_dict(metadata_dict)
         else:
             raise ValueError(f"Unsupported metadata format: {metadata_path.suffix}")
 

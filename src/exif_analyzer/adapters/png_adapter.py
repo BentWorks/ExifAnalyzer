@@ -19,9 +19,17 @@ from ..core.logger import logger
 class PNGAdapter(BaseMetadataAdapter):
     """Adapter for PNG image metadata operations."""
 
-    def __init__(self):
-        """Initialize PNG adapter."""
-        self.safety_manager = FileSafetyManager()
+    def __init__(self, safety_manager: Optional[FileSafetyManager] = None):
+        """
+        Initialize PNG adapter.
+
+        Args:
+            safety_manager: Optional FileSafetyManager for file operations.
+                           If None, creates a new instance.
+        """
+        super().__init__(safety_manager)
+        if self.safety_manager is None:
+            self.safety_manager = FileSafetyManager()
 
     @property
     def supported_formats(self) -> List[str]:

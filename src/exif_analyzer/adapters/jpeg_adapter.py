@@ -19,9 +19,17 @@ from ..core.logger import logger
 class JPEGAdapter(BaseMetadataAdapter):
     """Adapter for JPEG image metadata operations."""
 
-    def __init__(self):
-        """Initialize JPEG adapter."""
-        self.safety_manager = FileSafetyManager()
+    def __init__(self, safety_manager: Optional[FileSafetyManager] = None):
+        """
+        Initialize JPEG adapter.
+
+        Args:
+            safety_manager: Optional FileSafetyManager for file operations.
+                           If None, creates a new instance.
+        """
+        super().__init__(safety_manager)
+        if self.safety_manager is None:
+            self.safety_manager = FileSafetyManager()
 
     @property
     def supported_formats(self) -> List[str]:
@@ -312,14 +320,8 @@ class JPEGAdapter(BaseMetadataAdapter):
 
             # Basic validation - files should open successfully
             with Image.open(original_path) as orig, Image.open(modified_path) as mod:
-                # Check dimensions are identical
-                if orig.size != mod.size:
-                    logger.error(f"Size mismatch: {orig.size} vs {mod.size}")
-                    return False
-
-                # Check mode is preserved
-                if orig.mode != mod.mode:
-                    logger.error(f"Mode mismatch: {orig.mode} vs {mod.mode}")
+                # Check dimensions and mode using base method
+                if not self._check_image_dimensions_and_mode(orig, mod):
                     return False
 
                 # For JPEG integrity, we'll use a similarity check rather than exact match
@@ -365,14 +367,8 @@ class JPEGAdapter(BaseMetadataAdapter):
 
             # Basic validation - files should open successfully
             with Image.open(original_path) as orig, Image.open(modified_path) as mod:
-                # Check dimensions are identical
-                if orig.size != mod.size:
-                    logger.error(f"Size mismatch: {orig.size} vs {mod.size}")
-                    return False
-
-                # Check mode is preserved
-                if orig.mode != mod.mode:
-                    logger.error(f"Mode mismatch: {orig.mode} vs {mod.mode}")
+                # Check dimensions and mode using base method
+                if not self._check_image_dimensions_and_mode(orig, mod):
                     return False
 
                 # If we can open both files and dimensions match, assume integrity is OK
