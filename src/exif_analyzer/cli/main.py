@@ -140,8 +140,10 @@ def view(ctx, file_path: Path, output_json: bool, show_all: bool, privacy_check:
                             click.echo(f"\\n   {StyleFormatter.highlight(block_name)}:")
                             for key in sorted(block.keys()):
                                 value = str(block.get(key))
-                                if len(value) > 100:
-                                    value = value[:97] + "..."
+                                max_len = config.get("display.max_value_length", 100)
+                                suffix_len = config.get("display.truncation_suffix_length", 3)
+                                if len(value) > max_len:
+                                    value = value[:max_len - suffix_len] + "..."
 
                                 # Highlight sensitive keys
                                 if privacy_check and any(pattern in key.lower() for pattern in config.get_privacy_patterns()):

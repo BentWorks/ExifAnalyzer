@@ -334,7 +334,8 @@ class JPEGAdapter(BaseMetadataAdapter):
 
                 # JPEG recompression should have very low MSE (< 1.0 for same quality)
                 # If MSE is higher, there might be actual corruption
-                max_acceptable_mse = 2.0  # Conservative threshold
+                from ..core.config import config
+                max_acceptable_mse = config.get("integrity.jpeg_mse_threshold", 2.0)
 
                 if mse > max_acceptable_mse:
                     logger.error(f"High MSE detected: {mse:.2f} (threshold: {max_acceptable_mse})")

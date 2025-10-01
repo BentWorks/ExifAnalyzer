@@ -90,8 +90,11 @@ class FileSafetyManager:
         """
         hasher = hashlib.sha256()
         try:
+            from .config import config
+            chunk_size = config.get("integrity.file_hash_chunk_size", 4096)
+
             with open(file_path, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
+                for chunk in iter(lambda: f.read(chunk_size), b""):
                     hasher.update(chunk)
             return hasher.hexdigest()
         except Exception as e:
@@ -119,10 +122,11 @@ class FileSafetyManager:
             modified_size = modified_path.stat().st_size
 
             # File sizes can differ due to metadata changes, but shouldn't be drastically different
-            # Allow up to 10% size difference (metadata changes)
+            from .config import config
+            max_ratio = config.get("integrity.file_size_change_ratio", 0.1)
             size_ratio = abs(modified_size - original_size) / original_size if original_size > 0 else 0
 
-            if size_ratio > 0.1:  # More than 10% difference
+            if size_ratio > max_ratio:
                 logger.warning(f"Significant size difference: {original_size} -> {modified_size}")
 
             return True

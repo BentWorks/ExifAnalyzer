@@ -48,6 +48,17 @@ class ConfigManager:
             "level": "INFO",
             "file_logging": False,
             "log_directory": "logs"
+        },
+        "display": {
+            "max_value_length": 100,  # Maximum characters to display for metadata values
+            "truncation_suffix_length": 3,  # Length of "..." suffix
+            "preview_image_size": 300,  # Size in pixels for GUI image preview
+            "status_bar_width": 50  # Width of status bar in GUI
+        },
+        "integrity": {
+            "jpeg_mse_threshold": 2.0,  # Max acceptable MSE for JPEG integrity check
+            "file_size_change_ratio": 0.1,  # Max acceptable file size change (10%)
+            "file_hash_chunk_size": 4096  # Chunk size in bytes for file hashing
         }
     }
 
