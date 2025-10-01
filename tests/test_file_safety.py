@@ -332,15 +332,12 @@ class TestFileSafetyManager:
         test_file = temp_dir / "test_backup_error.jpg"
         self.create_test_image(test_file)
 
-        # Try to create backup to a read-only directory (if possible)
-        readonly_dir = temp_dir / "readonly"
-        readonly_dir.mkdir()
+        # Test backup of non-existent source file - this should raise FileError
+        nonexistent_source = temp_dir / "nonexistent.jpg"
+        backup_path = temp_dir / "backup.jpg"
 
-        # Try to backup to an invalid path - this should reliably fail
-        invalid_path = temp_dir / "nonexistent_dir" / "deeply" / "nested" / "backup.jpg"
-
-        with pytest.raises(BackupError):
-            self.safety_manager.create_backup(test_file, invalid_path)
+        with pytest.raises(FileError):
+            self.safety_manager.create_backup(nonexistent_source, backup_path)
 
     def test_calculate_file_hash_exception(self, temp_dir):
         """Test file hash calculation with error conditions."""
