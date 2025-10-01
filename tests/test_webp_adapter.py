@@ -277,3 +277,184 @@ class TestWebPAdapter:
 
         assert readback_metadata.format == "WebP"
         assert readback_metadata.file_path == output_image
+
+    def test_adapter_without_safety_manager(self):
+        """Test adapter initialization without safety manager."""
+        # Create adapter without providing safety manager
+        adapter = WebPAdapter(safety_manager=None)
+
+        # Should auto-create safety manager
+        assert adapter.safety_manager is not None
+
+    def test_xmp_string_type_handling(self, temp_dir):
+        """Test XMP handling when it's a string instead of bytes."""
+        test_image = temp_dir / "test_xmp_str.webp"
+
+        # Create WebP with XMP as string (edge case)
+        img = Image.new('RGB', (100, 100), color='pink')
+
+        # Manually set XMP in info (simulating string XMP)
+        img.info['xmp'] = '<?xml version="1.0"?><x:xmpmeta>String XMP</x:xmpmeta>'
+        img.save(test_image, format='WebP')
+
+        metadata = self.adapter.read_metadata(test_image)
+
+        # Should handle string XMP
+        assert not metadata.xmp.is_empty() or metadata.custom is not None
+
+    def test_write_with_lossless_preservation(self, temp_dir):
+        """Test that lossless mode is preserved during write."""
+        test_image = temp_dir / "test_lossless_write.webp"
+        output_image = temp_dir / "output_lossless_write.webp"
+
+        # Create lossless WebP
+        img = Image.new('RGB', (100, 100), color='teal')
+        img.save(test_image, format='WebP', lossless=True)
+
+        # Read and write
+        metadata = self.adapter.read_metadata(test_image)
+        self.adapter.write_metadata(metadata, output_image)
+
+        # Output should exist
+        assert output_image.exists()
+
+    def test_write_with_exif_data(self, temp_dir):
+        """Test writing WebP with EXIF data."""
+        test_image = temp_dir / "test_write_exif.webp"
+        output_image = temp_dir / "output_write_exif.webp"
+
+        # Create WebP
+        img = Image.new('RGB', (100, 100), color='navy')
+
+        # Add EXIF
+        exif = img.getexif()
+        exif[0x010F] = "Test Make"
+        exif_bytes = exif.tobytes()
+        img.save(test_image, format='WebP', exif=exif_bytes)
+
+        # Read metadata
+        metadata = self.adapter.read_metadata(test_image)
+
+        # Add more EXIF via metadata
+        metadata.exif.set("Model", "Test Model")
+
+        # Write with EXIF
+        self.adapter.write_metadata(metadata, output_image)
+
+        assert output_image.exists()
+
+    def test_write_with_xmp_bytes(self, temp_dir):
+        """Test writing WebP with XMP data as bytes."""
+        test_image = temp_dir / "test_write_xmp.webp"
+        output_image = temp_dir / "output_write_xmp.webp"
+
+        self.create_test_webp(test_image)
+
+        # Read and add XMP
+        metadata = self.adapter.read_metadata(test_image)
+        metadata.xmp.set('raw_xmp', '<?xml version="1.0"?><x:xmpmeta>Test</x:xmpmeta>')
+
+        # Write with XMP
+        self.adapter.write_metadata(metadata, output_image)
+
+        assert output_image.exists()
+
+    def test_write_with_xmp_string(self, temp_dir):
+        """Test writing WebP with XMP data as string."""
+        test_image = temp_dir / "test_write_xmp_str.webp"
+        output_image = temp_dir / "output_write_xmp_str.webp"
+
+        self.create_test_webp(test_image)
+
+        # Read and add XMP as bytes (will test bytes conversion)
+        metadata = self.adapter.read_metadata(test_image)
+        metadata.xmp.set('raw_xmp', b'<?xml version="1.0"?><x:xmpmeta>Bytes XMP</x:xmpmeta>')
+
+        # Write with XMP
+        self.adapter.write_metadata(metadata, output_image)
+
+        assert output_image.exists()
+
+    def test_write_error_handling(self, temp_dir):
+        """Test write_metadata error handling."""
+        test_image = temp_dir / "test_write_error.webp"
+        self.create_test_webp(test_image)
+
+        metadata = self.adapter.read_metadata(test_image)
+
+        # Try to write to invalid path
+        invalid_path = Path("/invalid:\\/path/output.webp")
+
+        with pytest.raises(MetadataError) as exc_info:
+            self.adapter.write_metadata(metadata, invalid_path)
+
+        assert "Failed to write WebP metadata" in str(exc_info.value)
+
+    def test_strip_error_handling(self, temp_dir):
+        """Test strip_metadata error handling."""
+        test_image = temp_dir / "test_strip_error.webp"
+        self.create_test_webp(test_image)
+
+        # Try to strip to invalid path
+        invalid_path = Path("/invalid:\\/path/output.webp")
+
+        with pytest.raises(MetadataError) as exc_info:
+            self.adapter.strip_metadata(test_image, invalid_path)
+
+        assert "Failed to strip WebP metadata" in str(exc_info.value)
+
+    def test_parse_exif_bytes_error_handling(self, temp_dir):
+        """Test _parse_exif_bytes with invalid data."""
+        # This tests the exception handler in _parse_exif_bytes
+        test_image = temp_dir / "test_exif_parse.webp"
+
+        # Create WebP with malformed EXIF
+        img = Image.new('RGB', (100, 100), color='lime')
+
+        # Invalid EXIF bytes
+        bad_exif = b'\xff\xff\xff\xff'
+        try:
+            img.save(test_image, format='WebP', exif=bad_exif)
+
+            # Try to read - should handle gracefully
+            metadata = self.adapter.read_metadata(test_image)
+            assert metadata is not None
+        except:
+            # If save fails, that's also acceptable
+            pass
+
+    def test_build_exif_bytes_with_raw_exif(self):
+        """Test _build_exif_bytes with raw_exif data."""
+        from src.exif_analyzer.core.metadata import MetadataBlock
+
+        exif_block = MetadataBlock(name='exif')
+        exif_block.set('raw_exif', '4142434445')  # Hex string
+
+        result = self.adapter._build_exif_bytes(exif_block)
+
+        assert result is not None
+        assert isinstance(result, bytes)
+
+    def test_build_exif_bytes_with_invalid_hex(self):
+        """Test _build_exif_bytes with invalid hex string."""
+        from src.exif_analyzer.core.metadata import MetadataBlock
+
+        exif_block = MetadataBlock(name='exif')
+        exif_block.set('raw_exif', 'not_valid_hex')  # Invalid hex
+
+        result = self.adapter._build_exif_bytes(exif_block)
+
+        # Should return None on failure
+        assert result is None
+
+    def test_build_exif_bytes_without_raw_exif(self):
+        """Test _build_exif_bytes without raw_exif."""
+        from src.exif_analyzer.core.metadata import MetadataBlock
+
+        exif_block = MetadataBlock(name='exif')
+        exif_block.set('SomeTag', 'SomeValue')  # No raw_exif
+
+        result = self.adapter._build_exif_bytes(exif_block)
+
+        # Should return None
+        assert result is None

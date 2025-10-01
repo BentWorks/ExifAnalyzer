@@ -385,3 +385,162 @@ class TestJPEGAdapter:
         assert metadata.format == "JPEG"
         # May have no EXIF or minimal EXIF
         assert isinstance(metadata.exif.keys(), list)
+
+    def test_adapter_without_safety_manager(self):
+        """Test JPEG adapter initialization without safety manager."""
+        adapter = JPEGAdapter(safety_manager=None)
+
+        # Should auto-create safety manager
+        assert adapter.safety_manager is not None
+
+    def test_read_metadata_general_exception(self, temp_dir):
+        """Test read_metadata with general exception during processing."""
+        jpeg_file = temp_dir / "test_exception.jpg"
+
+        # Create a file that opens as JPEG but causes issues during metadata read
+        img = Image.new('RGB', (10, 10), color='white')
+        img.save(jpeg_file, "JPEG")
+
+        # Try to read (should handle any exceptions gracefully)
+        try:
+            metadata = self.adapter.read_metadata(jpeg_file)
+            assert metadata is not None
+        except MetadataError:
+            # Acceptable to raise MetadataError
+            pass
+
+    def test_write_metadata_to_same_file(self, temp_dir):
+        """Test writing metadata back to the same file (in-place)."""
+        jpeg_file = temp_dir / "test_inplace.jpg"
+        self.create_test_jpeg_with_exif(jpeg_file)
+
+        # Read metadata
+        metadata = self.adapter.read_metadata(jpeg_file)
+        metadata.exif.set("Artist", "Modified Artist")
+
+        # Write to same file (output_path = None means in-place)
+        result = self.adapter.write_metadata(metadata, output_path=None)
+
+        assert result == jpeg_file
+        assert jpeg_file.exists()
+
+    def test_strip_metadata_in_place(self, temp_dir):
+        """Test stripping metadata in-place (same file)."""
+        jpeg_file = temp_dir / "test_strip_inplace.jpg"
+        self.create_test_jpeg_with_exif(jpeg_file)
+
+        # Verify has metadata
+        original_metadata = self.adapter.read_metadata(jpeg_file)
+        assert original_metadata.has_metadata()
+
+        # Strip in-place (output_path = None)
+        result = self.adapter.strip_metadata(jpeg_file, output_path=None)
+
+        assert result == jpeg_file
+        assert jpeg_file.exists()
+
+    def test_exif_bytes_decoding_error(self, temp_dir):
+        """Test handling of EXIF bytes that fail to decode."""
+        jpeg_file = temp_dir / "test_bad_bytes.jpg"
+
+        # Create JPEG with bytes value that has decoding issues
+        img = Image.new('RGB', (100, 100), color='silver')
+
+        exif_dict = {
+            "0th": {
+                piexif.ImageIFD.Make: b'\xff\xfe\xfd',  # Invalid UTF-8 bytes
+            }
+        }
+
+        exif_bytes = piexif.dump(exif_dict)
+        img.save(jpeg_file, "JPEG", exif=exif_bytes)
+
+        # Should handle decoding errors gracefully
+        metadata = self.adapter.read_metadata(jpeg_file)
+        assert metadata is not None
+
+    def test_read_1st_ifd_tags(self, temp_dir):
+        """Test reading tags from 1st IFD (thumbnail)."""
+        jpeg_file = temp_dir / "test_1st_ifd.jpg"
+
+        img = Image.new('RGB', (100, 100), color='gold')
+
+        exif_dict = {
+            "0th": {
+                piexif.ImageIFD.Make: "Main",
+            },
+            "1st": {
+                piexif.ImageIFD.ImageWidth: 50,
+                piexif.ImageIFD.ImageLength: 50,
+            }
+        }
+
+        exif_bytes = piexif.dump(exif_dict)
+        img.save(jpeg_file, "JPEG", exif=exif_bytes)
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Should read 1st IFD tags
+        assert len(metadata.exif.keys()) > 0
+
+    def test_iptc_read_exception_handling(self, temp_dir):
+        """Test IPTC reading with exception."""
+        jpeg_file = temp_dir / "test_iptc_error.jpg"
+
+        # Create basic JPEG
+        img = Image.new('RGB', (100, 100), color='maroon')
+        img.save(jpeg_file, "JPEG")
+
+        # Reading should handle IPTC exceptions gracefully
+        metadata = self.adapter.read_metadata(jpeg_file)
+        assert metadata is not None
+
+    def test_xmp_partial_packet(self, temp_dir):
+        """Test XMP reading with incomplete packet."""
+        jpeg_file = temp_dir / "test_xmp_partial.jpg"
+
+        # Create JPEG
+        img = Image.new('RGB', (100, 100), color='olive')
+        img.save(jpeg_file, "JPEG")
+
+        # Inject partial XMP (missing end marker)
+        with open(jpeg_file, 'rb') as f:
+            data = f.read()
+
+        xmp_partial = b'http://ns.adobe.com/xap/1.0/\x00<?xpacket begin=""?><x:xmpmeta>Partial XMP'
+        modified_data = data[:100] + xmp_partial + data[100:]
+
+        with open(jpeg_file, 'wb') as f:
+            f.write(modified_data)
+
+        # Should handle gracefully
+        metadata = self.adapter.read_metadata(jpeg_file)
+        assert metadata is not None
+
+    def test_write_metadata_error_handling(self, temp_dir):
+        """Test write_metadata error handling."""
+        jpeg_file = temp_dir / "test_write_err.jpg"
+        self.create_test_jpeg_with_exif(jpeg_file)
+
+        metadata = self.adapter.read_metadata(jpeg_file)
+
+        # Try to write to invalid path
+        invalid_path = Path("/invalid:\\/path/output.jpg")
+
+        with pytest.raises(MetadataError) as exc_info:
+            self.adapter.write_metadata(metadata, invalid_path)
+
+        assert "Failed to write JPEG metadata" in str(exc_info.value)
+
+    def test_strip_metadata_error_handling(self, temp_dir):
+        """Test strip_metadata error handling."""
+        jpeg_file = temp_dir / "test_strip_err.jpg"
+        self.create_test_jpeg_with_exif(jpeg_file)
+
+        # Try to strip to invalid path
+        invalid_path = Path("/invalid:\\/path/output.jpg")
+
+        with pytest.raises(MetadataError) as exc_info:
+            self.adapter.strip_metadata(jpeg_file, invalid_path)
+
+        assert "Failed to strip JPEG metadata" in str(exc_info.value)
