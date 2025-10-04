@@ -68,4 +68,10 @@ sample_images/
 # Keep important build files but ignore executables
 !build_config.py
 !cli_launcher.py
-!gui_launcher.pycoverage.json
+!gui_launcher.py
+
+# AI Agent instruction files (keep locally, exclude from repo)
+AGENTS.md
+Instructions.md
+version_info.txt
+coverage.json
